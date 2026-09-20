@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#fbf7f4">
 <title>My Planner ♡</title>
-<meta name="planner-version" content="family-fix-3">
 <link rel="manifest" href="manifest.webmanifest">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -44,7 +43,7 @@ const SUPABASE_URL="https://ijgfuksbvggowqzgucjp.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqZ2Z1a3Nidmdnb3dxemd1Y2pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MTUxMTksImV4cCI6MjEwNTQ5MTExOX0.D8aHYQw7s3Gcg61Nzu8vWQHlj6ZKM2JnE6djnzq2cP4";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const colors=["#dceaf5","#f4d9df","#e7def1","#dfeadf","#f7e2d4","#f6edcf"];
-let session=null,profile=null,family=null,members=[],calendars=[],events=[],tasks=[],tabName="today",cursor=new Date();cursor.setDate(1);
+let session=null,profile=null,family=null,members=[],calendars=[],events=[],tasks=[],familyDebug={},tabName="today",cursor=new Date();cursor.setDate(1);
 const esc=s=>(s??"").toString().replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const iso=d=>{let x=new Date(d.getTime()-d.getTimezoneOffset()*60000);return x.toISOString().slice(0,10)}, today=()=>iso(new Date());
 const cal=id=>calendars.find(c=>c.id===id);
@@ -57,23 +56,24 @@ async function boot(){
 async function load(){
  if(!session){renderAuth();return}
  const uid=session.user.id;
+ familyDebug={uid, errors:[]};
  let p=await db.from("profiles").select("*").eq("id",uid).maybeSingle();profile=p.data;
+ if(p.error) familyDebug.errors.push("profiles: "+p.error.message);
  family=null;members=[];
- // Resolve membership first. Every signed-in user may read their own membership row.
- let fm=await db.from("family_members").select("family_id,role").eq("user_id",uid).order("joined_at",{ascending:false}).limit(1);
- if(fm.error){
-   console.error("family_members load failed",fm.error);
- }
- if(fm.data?.length){
-   let f=await db.from("families").select("*").eq("id",fm.data[0].family_id).maybeSingle();
-   if(f.error) console.error("family load failed",f.error);
-   family=f.data||null;
- }
- // Creator fallback (useful immediately after creating a family).
- if(!family){
-   let ownFamily=await db.from("families").select("*").eq("created_by",uid).order("created_at",{ascending:false}).limit(1).maybeSingle();
-   if(ownFamily.error) console.error("creator family load failed",ownFamily.error);
-   family=ownFamily.data||null;
+ // Owners can load the family directly. This avoids a circular RLS dependency
+ // while still allowing joined family members to resolve their membership.
+ let ownFamily=await db.from("families").select("*").eq("created_by",uid).order("created_at",{ascending:false}).limit(1).maybeSingle();
+ familyDebug.ownFamily=ownFamily.data||null; if(ownFamily.error) familyDebug.errors.push("families(owner): "+ownFamily.error.message);
+ if(ownFamily.data){
+   family=ownFamily.data;
+ }else{
+   let fm=await db.from("family_members").select("family_id,role").eq("user_id",uid).limit(1);
+   familyDebug.membership=fm.data||[]; if(fm.error) familyDebug.errors.push("family_members: "+fm.error.message);
+   if(fm.data?.length){
+     let f=await db.from("families").select("*").eq("id",fm.data[0].family_id).maybeSingle();
+     if(f.error) familyDebug.errors.push("families(id): "+f.error.message);
+     family=f.data;
+   }
  }
  if(family){
    let ms=await db.from("family_members").select("user_id,role,joined_at").eq("family_id",family.id);
@@ -109,7 +109,7 @@ function taskLine(t){return `<div class="listitem row"><button class="check ${t.
 function tasksView(){document.getElementById("view").innerHTML=`<div class="card"><div class="between row"><h2>Aufgaben ✓</h2><button class="btn" onclick="openAdd('task')">＋</button></div></div><div class="card">${tasks.length?tasks.map(taskLine).join(""):`<p class="muted">Noch keine Aufgaben.</p>`}</div>`}
 async function familyView(){
  document.getElementById("fab").style.display="none";
- if(!family){document.getElementById("view").innerHTML=`<div class="card"><div class="muted">FAMILIE</div><h2>Gemeinsam planen ♡</h2><p class="muted">Erstelle eure Familiengruppe oder tritt mit einem Einladungscode bei.</p></div><div class="card"><h3>Familie erstellen</h3><div class="label">Name</div><input id="familyName" value="Familie"><button class="btn primary wide" onclick="createFamily()">Familie erstellen</button></div><div class="card"><h3>Familie beitreten</h3><div class="label">Einladungscode</div><input id="joinCode" placeholder="z. B. A1B2C3D4"><button class="btn wide" onclick="joinFamily()">Mit Code beitreten</button></div><div class="card"><button class="btn wide" onclick="signOut()">Abmelden</button></div>`;return}
+ if(!family){let dbg=`<div class="card"><h3>Diagnose</h3><div class="muted">App-User-ID</div><div style="font-size:12px;word-break:break-all">${esc(familyDebug.uid||"-")}</div><div class="muted" style="margin-top:10px">Owner-Familie gefunden</div><div>${familyDebug.ownFamily?"JA":"NEIN"}</div><div class="muted" style="margin-top:10px">Mitgliedschaft gefunden</div><div>${familyDebug.membership?.length?"JA":"NEIN"}</div><div class="muted" style="margin-top:10px">Supabase-Fehler</div><div style="font-size:12px;word-break:break-word">${familyDebug.errors?.length?esc(familyDebug.errors.join(" | ")):"Keine Fehlermeldung"}</div></div>`;document.getElementById("view").innerHTML=`${dbg}<div class="card"><div class="muted">FAMILIE</div><h2>Gemeinsam planen ♡</h2><p class="muted">Erstelle eure Familiengruppe oder tritt mit einem Einladungscode bei.</p></div><div class="card"><h3>Familie erstellen</h3><div class="label">Name</div><input id="familyName" value="Familie"><button class="btn primary wide" onclick="createFamily()">Familie erstellen</button></div><div class="card"><h3>Familie beitreten</h3><div class="label">Einladungscode</div><input id="joinCode" placeholder="z. B. A1B2C3D4"><button class="btn wide" onclick="joinFamily()">Mit Code beitreten</button></div><div class="card"><button class="btn wide" onclick="signOut()">Abmelden</button></div>`;return}
  let shared=calendars.filter(c=>c.family_id===family.id);
  document.getElementById("view").innerHTML=`<div class="card"><div class="muted">FAMILIE</div><h2>${esc(family.name)} ♡</h2><p class="muted">Diesen Code schickst du Mama und deinem Bruder. Sie erstellen zuerst einen eigenen Account und treten danach damit bei.</p><div class="code">${esc(family.invite_code)}</div><button class="btn wide" onclick="copyCode()">Code kopieren</button></div><div class="card"><div class="between row"><h3>Freigegebene Kalender</h3><button class="btn" onclick="openNewCalendar(true)">＋</button></div>${shared.length?shared.map(c=>`<div class="listitem row"><span class="swatch" style="background:${c.color}"></span><div style="flex:1"><b>${esc(c.icon+" "+c.name)}</b><div class="muted">${c.owner_id===session.user.id?"Von dir":"Familienmitglied"} · ${c.sharing==="details"?"Details sichtbar":c.sharing==="busy"?"Nur beschäftigt":"Privat"}</div></div>${c.owner_id===session.user.id?`<button class="btn" onclick="editCalendar('${c.id}')">✎</button>`:""}</div>`).join(""):`<p class="muted">Noch keine Kalender freigegeben.</p>`}</div><div class="card"><p class="muted">Mitglieder: ${members.length}</p><button class="btn wide" onclick="signOut()">Abmelden</button></div>`}
 async function createFamily(){let b=document.querySelector('button[onclick="createFamily()"]');if(b){b.disabled=true;b.textContent="Wird erstellt …"}let {error}=await db.rpc("create_family",{p_name:familyName.value.trim()||"Familie"});if(error){if(b){b.disabled=false;b.textContent="Familie erstellen"}return msg(error.message)}await load()}
