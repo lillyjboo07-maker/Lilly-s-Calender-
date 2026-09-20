@@ -1,9 +1,8 @@
 {
-  "name": "My Planner ♡",
-  "short_name": "My Planner",
+  "name": "My Planner Family",
+  "short_name": "Planner",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#fbf7f4",
-  "theme_color": "#fbf7f4",
-  "description": "Mein persönlicher Pastell-Kalender"
+  "theme_color": "#fbf7f4"
 }

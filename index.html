@@ -1,9 +1,12 @@
 <!doctype html>
 <html lang="de">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#fbf7f4"><title>My Planner ♡</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#fbf7f4">
+<title>My Planner ♡</title>
 <link rel="manifest" href="manifest.webmanifest">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--bg:#fbf7f4;--paper:#fffefd;--ink:#403839;--muted:#9b8f90;--line:#eee3e1;--pink:#f4d9df;--blue:#dceaf5;--sage:#dfeadf;--lav:#e7def1;--peach:#f7e2d4;--yellow:#f6edcf;--shadow:0 10px 30px #70505012}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -20,103 +23,55 @@ h2,h3,p{margin:5px 0}h2{font:22px Georgia,serif}h3{font-size:15px}.muted{color:v
 input,textarea,select{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;padding:11px;color:var(--ink)}textarea{min-height:70px;resize:vertical}.label{font-size:12px;color:var(--muted);margin:11px 2px 5px}.modal{position:fixed;inset:0;background:#463b3b55;display:flex;align-items:flex-end;justify-content:center;z-index:50}.sheet{background:var(--bg);width:min(760px,100%);max-height:88vh;overflow:auto;border-radius:25px 25px 0 0;padding:18px 16px calc(24px + env(safe-area-inset-bottom))}
 .fab{position:fixed;right:20px;bottom:82px;z-index:25;background:#e9c5ce;box-shadow:0 7px 18px #73505b25}.progress{height:8px;background:#eee6e4;border-radius:10px;overflow:hidden}.progress i{display:block;height:100%;background:#cbdccf}
 .chips{display:flex;gap:7px;overflow:auto;padding:4px 0}.chip{white-space:nowrap;border:1px solid var(--line);border-radius:99px;padding:7px 10px;background:#fff;font-size:12px}
+.auth{max-width:430px;margin:40px auto}.share{font-size:11px;margin-left:6px;padding:3px 7px;border-radius:99px;background:#f5eeee}
 @media(max-width:480px){.day{min-height:76px;padding:4px}.event{display:block;font-size:8px;padding:2px 3px}.grid{gap:3px}.card{padding:14px}.brand{font-size:25px}}
-</style></head>
-<body><div class="app">
-<header><div><div class="brand">My Planner ♡</div><div class="sub" id="hello"></div></div><button class="btn" onclick="openCalendars()">Kalender</button></header>
+</style>
+</head>
+<body>
+<div class="app">
+<header><div><div class="brand">My Planner ♡</div><div class="sub" id="hello">Family Sync</div></div><button class="btn" id="calBtn" onclick="openCalendars()">Kalender</button></header>
 <main id="view"></main>
-<button class="btn round fab" onclick="openAdd()">＋</button>
-<nav class="tabs">
+<button class="btn round fab" id="fab" onclick="openAdd()">＋</button>
+<nav class="tabs" id="tabs">
 <button data-tab="today" onclick="tab('today')"><b>♡</b>Heute</button>
 <button data-tab="month" onclick="tab('month')"><b>▦</b>Kalender</button>
 <button data-tab="tasks" onclick="tab('tasks')"><b>✓</b>Aufgaben</button>
-<button data-tab="school" onclick="tab('school')"><b>⌁</b>Schule</button>
-</nav></div><div id="modal"></div>
+<button data-tab="family" onclick="tab('family')"><b>⌂</b>Familie</button>
+</nav>
+</div><div id="modal"></div>
 <script>
-const KEY="lilly_planner_v1";
-const colors=["#dceaf5","#f4d9df","#e7def1","#dfeadf","#f7e2d4","#f6edcf"];
-const seed=()=>({calendars:[
-{id:"school",name:"Schule",icon:"📚",color:colors[0],visible:true},
-{id:"mo",name:"Mo",icon:"♡",color:colors[1],visible:true},
-{id:"work",name:"Arbeit",icon:"💼",color:colors[2],visible:true},
-{id:"mama",name:"Mama",icon:"👩",color:colors[3],visible:false},
-{id:"private",name:"Privat",icon:"🎀",color:colors[5],visible:true},
-{id:"travel",name:"Reisen & Events",icon:"✈️",color:colors[4],visible:true}
-],events:[],tasks:[],ideas:[],tab:"today"});
-let S;try{S=JSON.parse(localStorage.getItem(KEY))||seed()}catch(e){S=seed()}
-S.calendars??=seed().calendars;S.events??=[];S.tasks??=[];S.ideas??=[];S.tab??="today";S.focusCal??=null;
-S.events.forEach(e=>{e.endDate??=e.date;e.endTime??="";e.allDay??=!e.time});
-let cursor=new Date();cursor.setDate(1);
-const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
+const SUPABASE_URL="https://ijgfuksbvggowqzgucjp.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqZ2Z1a3Nidmdnb3dxemd1Y2pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MTUxMTksImV4cCI6MjEwNTQ5MTExOX0.D8aHYQw7s3Gcg61Nzu8vWQHlj6ZKM2JnE6djnzq2cP4";
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let user=null, calendars=[], events=[], tasks=[], tabName="today", cursor=new Date();cursor.setDate(1);
 const esc=s=>(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-const iso=d=>{let x=new Date(d.getTime()-d.getTimezoneOffset()*60000);return x.toISOString().slice(0,10)}
-const today=()=>iso(new Date());
-const cal=id=>S.calendars.find(c=>c.id===id)||S.calendars[0];
-function tab(t){S.tab=t;save();render()}
-function nav(){document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===S.tab))}
-function occurs(e,date){return date>=e.date && date<=(e.endDate||e.date)}
-function visibleEvents(date){return S.events.filter(e=>occurs(e,date) && (cal(e.cal)?.visible))}
-function focusEvents(date,id){return S.events.filter(e=>occurs(e,date)&&e.cal===id)}
-function render(){
-document.getElementById("hello").textContent=new Intl.DateTimeFormat("de-DE",{weekday:"long",day:"numeric",month:"long"}).format(new Date());
-nav();let v=document.getElementById("view");
-if(S.tab==="month")v.innerHTML=monthView(); else if(S.tab==="tasks")v.innerHTML=tasksView(); else if(S.tab==="school")v.innerHTML=schoolView(); else v.innerHTML=todayView();
-}
-function todayView(){
-let d=today(), ev=visibleEvents(d).sort((a,b)=>(a.time||"99").localeCompare(b.time||"99")), ts=S.tasks.filter(t=>t.date===d);
-let done=ts.filter(t=>t.done).length,pct=ts.length?Math.round(done/ts.length*100):0;
-return `<div class="card"><div class="muted">DEIN TAG</div><h2>Heute ♡</h2><div class="chips">${S.calendars.filter(c=>c.visible).map(c=>`<span class="chip"><span class="dot" style="display:inline-block;background:${c.color}"></span> ${esc(c.name)}</span>`).join("")}</div></div>
-<div class="card"><div class="between row"><h3>Termine</h3><button class="btn" onclick="openAdd('event','${d}')">＋ Termin</button></div>${ev.length?ev.map(eventHTML).join(""):`<p class="muted" style="padding:12px 0">Heute ist noch nichts eingetragen.</p>`}</div>
-<div class="card"><div class="between row"><div><h3>Meine To-dos ♡</h3><div class="muted">${done}/${ts.length} geschafft</div></div><button class="btn" onclick="openAdd('task','${d}')">＋ To-do</button></div><div class="progress" style="margin:10px 0"><i style="width:${pct}%"></i></div>${ts.length?ts.map(taskHTML).join(""):`<p class="muted">Noch keine To-dos für heute.</p>`}</div>
-${upcoming()}`;
-}
-function upcoming(){let arr=S.events.filter(e=>e.date>today()&&cal(e.cal)?.visible).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);return `<div class="card"><h3>Als Nächstes</h3>${arr.length?arr.map(eventHTML).join(""):`<p class="muted">Noch nichts geplant.</p>`}</div>`}
-function eventHTML(e){let c=cal(e.cal);return `<div class="listitem row" onclick="editEvent('${e.id}')"><span class="swatch" style="background:${c.color}"></span><div style="flex:1"><b>${esc(e.title)}</b><div class="muted">${e.time?esc(e.time)+" · ":""}${esc(c.icon+" "+c.name)}${e.date!==today()?" · "+new Date(e.date+"T12:00").toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"}):""}</div></div></div>`}
-function taskHTML(t){return `<div class="listitem row"><button class="check ${t.done?"done":""}" onclick="toggleTask('${t.id}')">${t.done?"✓":""}</button><div class="${t.done?"doneText":""}" style="flex:1" onclick="editTask('${t.id}')">${esc(t.text)}${t.time?`<div class="muted">${esc(t.time)}</div>`:""}</div>${!t.done?`<button class="btn" onclick="tomorrow('${t.id}')">→ morgen</button>`:""}</div>`}
-function monthView(){
-let y=cursor.getFullYear(),m=cursor.getMonth(), first=new Date(y,m,1), start=(first.getDay()+6)%7, days=new Date(y,m+1,0).getDate(), prev=new Date(y,m,0).getDate(), cells=[];
-for(let i=0;i<42;i++){let n=i-start+1,d,other=false;if(n<1){d=new Date(y,m-1,prev+n);other=true}else if(n>days){d=new Date(y,m+1,n-days);other=true}else d=new Date(y,m,n);let ds=iso(d),ev=visibleEvents(ds),tt=S.tasks.filter(t=>t.date===ds&&!t.done);cells.push(`<div class="day ${other?"other":""} ${ds===today()?"today":""}" onclick="daySheet('${ds}')"><div class="num">${d.getDate()}</div>${ev.slice(0,2).map(e=>`<div class="event" style="background:${cal(e.cal).color}">${esc(e.title)}</div>`).join("")}<div class="dots">${ev.slice(2).map(e=>`<i class="dot" style="background:${cal(e.cal).color}"></i>`).join("")}${tt.length?`<i class="dot" style="background:#aaa"></i>`:""}</div></div>`)}
-return `<div class="card"><div class="calendar-head"><button class="btn" onclick="moveMonth(-1)">‹</button><div class="month">${first.toLocaleDateString("de-DE",{month:"long",year:"numeric"})}</div><button class="btn" onclick="moveMonth(1)">›</button></div><div class="weekdays">${["Mo","Di","Mi","Do","Fr","Sa","So"].map(x=>`<div>${x}</div>`).join("")}</div><div class="grid">${cells.join("")}</div></div>`;
-}
-function moveMonth(n){cursor.setMonth(cursor.getMonth()+n);render()}
-function tasksView(){let dated=S.tasks.filter(t=>t.date).sort((a,b)=>a.date.localeCompare(b.date)), someday=S.tasks.filter(t=>!t.date);return `<div class="card"><div class="between row"><div><div class="muted">AUFGABEN</div><h2>Alles im Blick ✓</h2></div><button class="btn" onclick="openAdd('task')">＋</button></div></div><div class="card"><h3>Geplant</h3>${dated.length?dated.map(t=>`<div><div class="muted" style="margin-top:9px">${new Date(t.date+"T12:00").toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"})}</div>${taskHTML(t)}</div>`).join(""):`<p class="muted">Keine Aufgaben.</p>`}</div><div class="card"><h3>Irgendwann ♡</h3>${someday.length?someday.map(taskHTML).join(""):`<p class="muted">Hier landen Aufgaben ohne Datum.</p>`}</div>`}
-function schoolView(){let exams=S.events.filter(e=>e.kind==="exam").sort((a,b)=>a.date.localeCompare(b.date));return `<div class="card"><div class="muted">SCHULE</div><h2>Klausuren & Lernen 🎓</h2><p class="muted">Klausuren, Abgaben und Lernblöcke an einem Ort.</p><button class="btn primary" style="margin-top:10px" onclick="openAdd('exam')">＋ Klausur</button></div><div class="card"><h3>Klausuren-Countdown</h3>${exams.length?exams.map(e=>{let diff=Math.ceil((new Date(e.date+"T12:00")-new Date(today()+"T12:00"))/86400000);return `<div class="listitem row" onclick="editEvent('${e.id}')"><span class="swatch" style="background:${cal(e.cal).color}"></span><div style="flex:1"><b>${esc(e.title)}</b><div class="muted">${new Date(e.date+"T12:00").toLocaleDateString("de-DE",{day:"numeric",month:"long"})}</div></div><span class="pill">${diff>=0?`noch ${diff} Tage`:"vorbei"}</span></div>`}).join(""):`<p class="muted">Noch keine Klausuren eingetragen.</p>`}</div>`}
-function openCalendars(){document.getElementById("modal").innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="between row"><h2>Meine Kalender</h2><button class="btn" onclick="closeModal()">Fertig</button></div><p class="muted">Tippe einen Kalender an, um ihn im Hauptkalender ein- oder auszublenden.</p>${S.calendars.map(c=>`<div class="calrow"><span class="swatch" style="background:${c.color}"></span><span style="flex:1;cursor:pointer" onclick="openSingleCal('${c.id}')">${esc(c.icon)} ${esc(c.name)} <span class="muted">›</span></span><span class="switch ${c.visible?"on":""}" onclick="event.stopPropagation();toggleCal('${c.id}')"><i></i></span></div>`).join("")}<button class="btn" style="width:100%;margin-top:10px" onclick="newCalendar()">＋ Neuen Kalender erstellen</button></div></div>`}
-function openSingleCal(id){S.focusCal=id;closeModal();singleCalRender()}
-function singleCalRender(){
- let c=cal(S.focusCal); if(!c){render();return}
- let y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),start=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate(),prev=new Date(y,m,0).getDate(),cells=[];
- for(let i=0;i<42;i++){let n=i-start+1,d,other=false;if(n<1){d=new Date(y,m-1,prev+n);other=true}else if(n>days){d=new Date(y,m+1,n-days);other=true}else d=new Date(y,m,n);let ds=iso(d),ev=focusEvents(ds,c.id);cells.push(`<div class="day ${other?"other":""} ${ds===today()?"today":""}" onclick="daySheet('${ds}','${c.id}')"><div class="num">${d.getDate()}</div>${ev.slice(0,3).map(e=>`<div class="event" style="display:block;background:${c.color}">${esc(e.title)}</div>`).join("")}</div>`)}
- document.getElementById("view").innerHTML=`<div class="card"><div class="between row"><button class="btn" onclick="S.focusCal=null;render()">‹ Zurück</button><h2>${esc(c.icon+" "+c.name)}</h2><button class="btn" onclick="openAdd('event',today(),'${c.id}')">＋</button></div></div><div class="card"><div class="calendar-head"><button class="btn" onclick="cursor.setMonth(cursor.getMonth()-1);singleCalRender()">‹</button><div class="month">${first.toLocaleDateString("de-DE",{month:"long",year:"numeric"})}</div><button class="btn" onclick="cursor.setMonth(cursor.getMonth()+1);singleCalRender()">›</button></div><div class="weekdays">${["Mo","Di","Mi","Do","Fr","Sa","So"].map(x=>`<div>${x}</div>`).join("")}</div><div class="grid">${cells.join("")}</div></div>`;
-}
-function toggleCal(id){let c=cal(id);c.visible=!c.visible;save();openCalendars();render()}
-function newCalendar(){let name=prompt("Wie soll der Kalender heißen?");if(!name)return;let icon=prompt("Welches Symbol?","♡")||"♡";let color=colors[S.calendars.length%colors.length];S.calendars.push({id:"c"+Date.now(),name,icon,color,visible:true});save();openCalendars();render()}
-function openAdd(type="event",date=today(),presetCal=""){let exam=type==="exam";document.getElementById("modal").innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="between row"><h2>${type==="task"?"Neues To-do":exam?"Neue Klausur":"Neuer Termin"} ♡</h2><button class="btn" onclick="closeModal()">×</button></div>${type==="task"?taskForm(date):eventForm(date,exam,presetCal)}</div></div>`}
-function eventForm(date,exam,presetCal="",e=null){
- let x=e||{title:"",date:date||today(),endDate:date||today(),time:"",endTime:"",cal:presetCal||(exam?"school":S.calendars[0].id),note:"",allDay:exam};
- return `<div class="label">Titel</div><input id="fTitle" value="${esc(x.title)}" placeholder="${exam?"z. B. Bio Klausur":"Was steht an?"}">
- <div class="row"><div style="flex:1"><div class="label">Startdatum</div><input id="fDate" type="date" value="${x.date}"></div><div style="flex:1"><div class="label">Enddatum</div><input id="fEndDate" type="date" value="${x.endDate||x.date}"></div></div>
- <div class="label"><label><input id="fAllDay" type="checkbox" style="width:auto" ${x.allDay?"checked":""} onchange="toggleTimes()"> Ganztägig</label></div>
- <div id="timeFields" class="row"><div style="flex:1"><div class="label">Von</div><input id="fTime" type="time" value="${x.time||""}"></div><div style="flex:1"><div class="label">Bis</div><input id="fEndTime" type="time" value="${x.endTime||""}"></div></div>
- <div class="label">Kalender</div><select id="fCal">${S.calendars.map(c=>`<option value="${c.id}" ${x.cal===c.id?"selected":""}>${esc(c.icon+" "+c.name)}</option>`).join("")}</select>
- <div class="label">Notiz / Ort</div><textarea id="fNote" placeholder="Optional…">${esc(x.note||"")}</textarea>
- <button class="btn primary" style="width:100%;margin-top:14px" onclick="${e?`updateEvent('${e.id}')`:`saveEvent(${exam})`}">Speichern</button>`}
-function toggleTimes(){let el=document.getElementById("timeFields");if(el)el.style.display=document.getElementById("fAllDay").checked?"none":"flex"}
-function readEventForm(){let end=fEndDate.value||fDate.value;if(end<fDate.value)end=fDate.value;return {title:fTitle.value.trim(),date:fDate.value,endDate:end,time:fAllDay.checked?"":fTime.value,endTime:fAllDay.checked?"":fEndTime.value,allDay:fAllDay.checked,cal:fCal.value,note:fNote.value}}
-function saveEvent(exam){let x=readEventForm();if(!x.title)return alert("Gib bitte einen Titel ein.");S.events.push({id:"e"+Date.now(),...x,kind:exam?"exam":"event"});save();closeModal();render()}
-function updateEvent(id){let e=S.events.find(x=>x.id===id);if(!e)return;let x=readEventForm();if(!x.title)return alert("Gib bitte einen Titel ein.");Object.assign(e,x);save();closeModal();S.focusCal?singleCalRender():render()}
-function taskForm(date,t=null){let x=t||{text:"",date:date||"",time:""};return `<div class="label">Aufgabe</div><input id="fText" value="${esc(x.text)}" placeholder="z. B. Zimmer saugen"><div class="row"><div style="flex:1"><div class="label">Datum (optional)</div><input id="fDate" type="date" value="${x.date||""}"></div><div style="flex:1"><div class="label">Uhrzeit (optional)</div><input id="fTime" type="time" value="${x.time||""}"></div></div><button class="btn primary" style="width:100%;margin-top:14px" onclick="${t?`updateTask('${t.id}')`:"saveTask()"}">Speichern</button>${t?`<button class="btn" style="width:100%;margin-top:8px" onclick="deleteTask('${t.id}')">To-do löschen</button>`:""}`}
-function saveTask(){let text=fText.value.trim();if(!text)return;S.tasks.push({id:"t"+Date.now(),text,date:fDate.value,time:fTime.value,done:false});save();closeModal();render()}
-function toggleTask(id){let t=S.tasks.find(x=>x.id===id);t.done=!t.done;save();render();if(document.getElementById("modal").innerHTML)daySheet(t.date)}
-function tomorrow(id){let t=S.tasks.find(x=>x.id===id),d=new Date((t.date||today())+"T12:00");d.setDate(d.getDate()+1);t.date=iso(d);save();render()}
-function daySheet(date,onlyCal=null){let ev=onlyCal?focusEvents(date,onlyCal):visibleEvents(date).sort((a,b)=>(a.time||"99").localeCompare(b.time||"99")),ts=S.tasks.filter(t=>t.date===date);document.getElementById("modal").innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="between row"><div><div class="muted">${new Date(date+"T12:00").toLocaleDateString("de-DE",{weekday:"long"})}</div><h2>${new Date(date+"T12:00").toLocaleDateString("de-DE",{day:"numeric",month:"long"})}</h2></div><button class="btn" onclick="closeModal()">×</button></div><div class="card"><div class="between row"><h3>Termine</h3><button class="btn" onclick="openAdd('event','${date}','${onlyCal||""}')">＋</button></div>${ev.length?ev.map(eventHTML).join(""):`<p class="muted">Keine Termine.</p>`}</div><div class="card"><div class="between row"><h3>To-dos ✓</h3><button class="btn" onclick="openAdd('task','${date}')">＋</button></div>${ts.length?ts.map(taskHTML).join(""):`<p class="muted">Keine To-dos.</p>`}</div></div></div>`}
-function editEvent(id){let e=S.events.find(x=>x.id===id);if(!e)return;document.getElementById("modal").innerHTML=`<div class="modal"><div class="sheet"><div class="between row"><h2>${esc(e.title)}</h2><button class="btn" onclick="closeModal()">×</button></div><p>${new Date(e.date+"T12:00").toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"})}${e.endDate&&e.endDate!==e.date?" – "+new Date(e.endDate+"T12:00").toLocaleDateString("de-DE",{day:"numeric",month:"long"}):""}${e.time?" · "+esc(e.time)+(e.endTime?"–"+esc(e.endTime):""):""}</p><p class="muted">${esc(cal(e.cal).icon+" "+cal(e.cal).name)}</p>${e.note?`<div class="card">${esc(e.note)}</div>`:""}<button class="btn primary" style="width:100%;margin-top:15px" onclick="showEditEvent('${id}')">✎ Bearbeiten</button><button class="btn" style="width:100%;margin-top:8px" onclick="deleteEvent('${id}')">Termin löschen</button></div></div>`}
-function showEditEvent(id){let e=S.events.find(x=>x.id===id);document.getElementById("modal").innerHTML=`<div class="modal"><div class="sheet"><div class="between row"><h2>Termin bearbeiten ✎</h2><button class="btn" onclick="closeModal()">×</button></div>${eventForm(e.date,e.kind==="exam",e.cal,e)}</div></div>`;setTimeout(toggleTimes,0)}
-function deleteEvent(id){if(confirm("Termin wirklich löschen?")){S.events=S.events.filter(e=>e.id!==id);save();closeModal();render()}}
-function editTask(id){let t=S.tasks.find(x=>x.id===id);if(!t)return;document.getElementById("modal").innerHTML=`<div class="modal"><div class="sheet"><div class="between row"><h2>To-do bearbeiten</h2><button class="btn" onclick="closeModal()">×</button></div>${taskForm(t.date,t)}</div></div>`}
-function updateTask(id){let t=S.tasks.find(x=>x.id===id);if(!t)return;t.text=fText.value.trim();t.date=fDate.value;t.time=fTime.value;save();closeModal();render()}
-function deleteTask(id){if(confirm("To-do wirklich löschen?")){S.tasks=S.tasks.filter(t=>t.id!==id);save();closeModal();render()}}
+const iso=d=>{let x=new Date(d.getTime()-d.getTimezoneOffset()*60000);return x.toISOString().slice(0,10)}, today=()=>iso(new Date());
+function showAuth(msg=""){document.getElementById("tabs").style.display="none";document.getElementById("fab").style.display="none";document.getElementById("calBtn").style.display="none";document.getElementById("view").innerHTML=`<div class="card auth"><div class="muted">FAMILY PLANNER</div><h2>Willkommen ♡</h2><p class="muted">Melde dich an oder erstelle ein Konto.</p>${msg?`<p>${esc(msg)}</p>`:""}<div class="label">E-Mail</div><input id="aEmail" type="email"><div class="label">Passwort</div><input id="aPass" type="password"><button class="btn primary" style="width:100%;margin-top:14px" onclick="login()">Anmelden</button><button class="btn" style="width:100%;margin-top:8px" onclick="signup()">Konto erstellen</button></div>`}
+async function login(){let {error}=await db.auth.signInWithPassword({email:aEmail.value,password:aPass.value});if(error)return alert(error.message);await boot()}
+async function signup(){let {error}=await db.auth.signUp({email:aEmail.value,password:aPass.value,options:{data:{display_name:aEmail.value.split("@")[0]}}});if(error)return alert(error.message);showAuth("Konto erstellt. Falls Supabase eine Bestätigungsmail verlangt, bestätige sie und melde dich danach an.")}
+async function logout(){await db.auth.signOut();user=null;showAuth()}
+async function boot(){let {data:{user:u}}=await db.auth.getUser();user=u;if(!user)return showAuth();document.getElementById("tabs").style.display="flex";document.getElementById("fab").style.display="block";document.getElementById("calBtn").style.display="block";await load();subscribe();render()}
+async function load(){let [c,e,t]=await Promise.all([db.from("calendars").select("*").order("name"),db.from("events").select("*").order("start_date"),db.from("tasks").select("*").order("due_date")]);if(c.error)console.warn(c.error);calendars=c.data||[];events=e.data||[];tasks=t.data||[]}
+function subscribe(){db.channel("planner-live").on("postgres_changes",{event:"*",schema:"public",table:"events"},async()=>{await load();render()}).on("postgres_changes",{event:"*",schema:"public",table:"calendars"},async()=>{await load();render()}).on("postgres_changes",{event:"*",schema:"public",table:"tasks"},async()=>{await load();render()}).subscribe()}
+function tab(t){tabName=t;render()} function nav(){document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tabName))}
+function cal(id){return calendars.find(c=>c.id===id)||{name:"Kalender",icon:"♡",color:"#f4d9df"}}
+function occurs(e,d){return d>=(e.start_date||"")&&d<=(e.end_date||e.start_date||"")}
+function visibleEvents(d){return events.filter(e=>occurs(e,d))}
+function render(){if(!user)return showAuth();document.getElementById("hello").textContent=new Intl.DateTimeFormat("de-DE",{weekday:"long",day:"numeric",month:"long"}).format(new Date());nav();let v=document.getElementById("view");if(tabName==="month")v.innerHTML=monthView();else if(tabName==="tasks")v.innerHTML=tasksView();else if(tabName==="family")v.innerHTML=familyView();else v.innerHTML=todayView()}
+function todayView(){let d=today(),ev=visibleEvents(d);return `<div class="card"><div class="muted">DEIN TAG</div><h2>Heute ♡</h2></div><div class="card"><div class="between row"><h3>Termine</h3><button class="btn" onclick="openAdd('event','${d}')">＋ Termin</button></div>${ev.length?ev.map(eventHTML).join(""):`<p class="muted">Heute ist noch nichts eingetragen.</p>`}</div><div class="card"><div class="between row"><h3>Meine To-dos</h3><button class="btn" onclick="openAdd('task','${d}')">＋</button></div>${tasks.filter(t=>t.due_date===d).map(taskHTML).join("")||`<p class="muted">Noch keine To-dos.</p>`}</div>`}
+function eventHTML(e){let c=cal(e.calendar_id);return `<div class="listitem row"><span class="swatch" style="background:${c.color||"#f4d9df"}"></span><div style="flex:1"><b>${esc(e.title)}</b><div class="muted">${esc(c.icon||"♡")} ${esc(c.name)}${e.starts_at?" · "+new Date(e.starts_at).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}):""}</div></div></div>`}
+function taskHTML(t){return `<div class="listitem row"><button class="check ${t.done?"done":""}" onclick="toggleTask('${t.id}',${!t.done})">${t.done?"✓":""}</button><div class="${t.done?"doneText":""}">${esc(t.text)}</div></div>`}
+function monthView(){let y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),start=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate(),prev=new Date(y,m,0).getDate(),cells=[];for(let i=0;i<42;i++){let n=i-start+1,d,other=false;if(n<1){d=new Date(y,m-1,prev+n);other=true}else if(n>days){d=new Date(y,m+1,n-days);other=true}else d=new Date(y,m,n);let ds=iso(d),ev=visibleEvents(ds);cells.push(`<div class="day ${other?"other":""} ${ds===today()?"today":""}" onclick="openAdd('event','${ds}')"><div class="num">${d.getDate()}</div>${ev.slice(0,3).map(e=>`<div class="event" style="background:${cal(e.calendar_id).color||"#f4d9df"}">${esc(e.title)}</div>`).join("")}</div>`)}return `<div class="card"><div class="calendar-head"><button class="btn" onclick="cursor.setMonth(cursor.getMonth()-1);render()">‹</button><div class="month">${first.toLocaleDateString("de-DE",{month:"long",year:"numeric"})}</div><button class="btn" onclick="cursor.setMonth(cursor.getMonth()+1);render()">›</button></div><div class="weekdays">${["Mo","Di","Mi","Do","Fr","Sa","So"].map(x=>`<div>${x}</div>`).join("")}</div><div class="grid">${cells.join("")}</div></div>`}
+function tasksView(){return `<div class="card"><div class="between row"><h2>Aufgaben ✓</h2><button class="btn" onclick="openAdd('task')">＋</button></div></div><div class="card">${tasks.length?tasks.map(taskHTML).join(""):`<p class="muted">Keine Aufgaben.</p>`}</div>`}
+function familyView(){return `<div class="card"><div class="muted">FAMILIE</div><h2>Gemeinsame Kalender ♡</h2><p class="muted">Hier erscheinen alle Kalender, die dir über deine Familie freigegeben wurden.</p></div><div class="card">${calendars.length?calendars.map(c=>`<div class="calrow"><span class="swatch" style="background:${c.color||"#f4d9df"}"></span><div style="flex:1"><b>${esc(c.icon||"♡")} ${esc(c.name)}</b><span class="share">${esc(c.sharing||"details")}</span></div></div>`).join(""):`<p class="muted">Noch keine Kalender vorhanden.</p>`}</div><div class="card"><button class="btn" style="width:100%" onclick="logout()">Abmelden</button></div>`}
+function openCalendars(){document.getElementById("modal").innerHTML=`<div class="modal"><div class="sheet"><div class="between row"><h2>Kalender</h2><button class="btn" onclick="closeModal()">×</button></div>${calendars.map(c=>`<div class="calrow"><span class="swatch" style="background:${c.color}"></span><span>${esc(c.icon||"♡")} ${esc(c.name)}</span></div>`).join("")}<button class="btn primary" style="width:100%;margin-top:12px" onclick="newCalendar()">＋ Kalender erstellen</button></div></div>`}
+async function newCalendar(){let name=prompt("Wie soll der Kalender heißen?");if(!name)return;let sharing=prompt("Freigabe: details, busy oder private?","details")||"details";if(!["details","busy","private"].includes(sharing))sharing="details";let {error}=await db.from("calendars").insert({owner_id:user.id,name,icon:"♡",color:"#f4d9df",sharing});if(error)return alert(error.message);closeModal();await load();render()}
+function openAdd(type="event",date=today()){if(type==="task"){document.getElementById("modal").innerHTML=`<div class="modal"><div class="sheet"><h2>Neues To-do</h2><div class="label">Aufgabe</div><input id="fText"><div class="label">Datum</div><input id="fDate" type="date" value="${date||""}"><button class="btn primary" style="width:100%;margin-top:14px" onclick="saveTask()">Speichern</button></div></div>`;return}if(!calendars.length)return alert("Erstelle zuerst einen Kalender.");document.getElementById("modal").innerHTML=`<div class="modal"><div class="sheet"><div class="between row"><h2>Neuer Termin ♡</h2><button class="btn" onclick="closeModal()">×</button></div><div class="label">Titel</div><input id="fTitle"><div class="row"><div style="flex:1"><div class="label">Start</div><input id="fDate" type="date" value="${date}"></div><div style="flex:1"><div class="label">Ende</div><input id="fEndDate" type="date" value="${date}"></div></div><div class="label">Kalender</div><select id="fCal">${calendars.map(c=>`<option value="${c.id}">${esc(c.icon||"♡")} ${esc(c.name)}</option>`).join("")}</select><div class="label">Notiz</div><textarea id="fNote"></textarea><button class="btn primary" style="width:100%;margin-top:14px" onclick="saveEvent()">Speichern</button></div></div>`}
+async function saveEvent(){let title=fTitle.value.trim();if(!title)return alert("Bitte Titel eingeben.");let {error}=await db.from("events").insert({calendar_id:fCal.value,owner_id:user.id,title,start_date:fDate.value,end_date:fEndDate.value||fDate.value,all_day:true,note:fNote.value,recurrence:{type:"none"}});if(error)return alert(error.message);closeModal();await load();render()}
+async function saveTask(){let text=fText.value.trim();if(!text)return;let {error}=await db.from("tasks").insert({owner_id:user.id,text,due_date:fDate.value||null,done:false});if(error)return alert(error.message);closeModal();await load();render()}
+async function toggleTask(id,done){let {error}=await db.from("tasks").update({done}).eq("id",id);if(error)return alert(error.message);await load();render()}
 function closeModal(){document.getElementById("modal").innerHTML=""}
-render();
+boot();
 if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js");
-</script></body></html>
+</script>
+</body></html>
