@@ -57,11 +57,22 @@ async function load(){
  if(!session){renderAuth();return}
  const uid=session.user.id;
  let p=await db.from("profiles").select("*").eq("id",uid).maybeSingle();profile=p.data;
- let fm=await db.from("family_members").select("family_id,role").eq("user_id",uid).limit(1);
  family=null;members=[];
- if(fm.data?.length){
-   let f=await db.from("families").select("*").eq("id",fm.data[0].family_id).single();family=f.data;
-   let ms=await db.from("family_members").select("user_id,role,joined_at").eq("family_id",family.id);members=ms.data||[];
+ // Owners can load the family directly. This avoids a circular RLS dependency
+ // while still allowing joined family members to resolve their membership.
+ let ownFamily=await db.from("families").select("*").eq("created_by",uid).order("created_at",{ascending:false}).limit(1).maybeSingle();
+ if(ownFamily.data){
+   family=ownFamily.data;
+ }else{
+   let fm=await db.from("family_members").select("family_id,role").eq("user_id",uid).limit(1);
+   if(fm.data?.length){
+     let f=await db.from("families").select("*").eq("id",fm.data[0].family_id).maybeSingle();
+     family=f.data;
+   }
+ }
+ if(family){
+   let ms=await db.from("family_members").select("user_id,role,joined_at").eq("family_id",family.id);
+   members=ms.data||[];
  }
  let cs=await db.from("calendars").select("*").order("created_at");calendars=cs.data||[];
  let es=await db.from("events").select("*").order("start_date");events=es.data||[];
@@ -96,7 +107,7 @@ async function familyView(){
  if(!family){document.getElementById("view").innerHTML=`<div class="card"><div class="muted">FAMILIE</div><h2>Gemeinsam planen ♡</h2><p class="muted">Erstelle eure Familiengruppe oder tritt mit einem Einladungscode bei.</p></div><div class="card"><h3>Familie erstellen</h3><div class="label">Name</div><input id="familyName" value="Familie"><button class="btn primary wide" onclick="createFamily()">Familie erstellen</button></div><div class="card"><h3>Familie beitreten</h3><div class="label">Einladungscode</div><input id="joinCode" placeholder="z. B. A1B2C3D4"><button class="btn wide" onclick="joinFamily()">Mit Code beitreten</button></div><div class="card"><button class="btn wide" onclick="signOut()">Abmelden</button></div>`;return}
  let shared=calendars.filter(c=>c.family_id===family.id);
  document.getElementById("view").innerHTML=`<div class="card"><div class="muted">FAMILIE</div><h2>${esc(family.name)} ♡</h2><p class="muted">Diesen Code schickst du Mama und deinem Bruder. Sie erstellen zuerst einen eigenen Account und treten danach damit bei.</p><div class="code">${esc(family.invite_code)}</div><button class="btn wide" onclick="copyCode()">Code kopieren</button></div><div class="card"><div class="between row"><h3>Freigegebene Kalender</h3><button class="btn" onclick="openNewCalendar(true)">＋</button></div>${shared.length?shared.map(c=>`<div class="listitem row"><span class="swatch" style="background:${c.color}"></span><div style="flex:1"><b>${esc(c.icon+" "+c.name)}</b><div class="muted">${c.owner_id===session.user.id?"Von dir":"Familienmitglied"} · ${c.sharing==="details"?"Details sichtbar":c.sharing==="busy"?"Nur beschäftigt":"Privat"}</div></div>${c.owner_id===session.user.id?`<button class="btn" onclick="editCalendar('${c.id}')">✎</button>`:""}</div>`).join(""):`<p class="muted">Noch keine Kalender freigegeben.</p>`}</div><div class="card"><p class="muted">Mitglieder: ${members.length}</p><button class="btn wide" onclick="signOut()">Abmelden</button></div>`}
-async function createFamily(){let {error}=await db.rpc("create_family",{p_name:familyName.value.trim()||"Familie"});if(error)return msg(error.message);await load()}
+async function createFamily(){let b=document.querySelector('button[onclick="createFamily()"]');if(b){b.disabled=true;b.textContent="Wird erstellt …"}let {error}=await db.rpc("create_family",{p_name:familyName.value.trim()||"Familie"});if(error){if(b){b.disabled=false;b.textContent="Familie erstellen"}return msg(error.message)}await load()}
 async function joinFamily(){let {error}=await db.rpc("join_family",{p_code:joinCode.value.trim()});if(error)return msg(error.message);await load()}
 async function copyCode(){try{await navigator.clipboard.writeText(family.invite_code);msg("Einladungscode kopiert ♡")}catch(e){msg("Code: "+family.invite_code)}}
 function openCalendars(){document.getElementById("modal").innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="between row"><h2>Meine Kalender</h2><button class="btn" onclick="closeModal()">Fertig</button></div>${calendars.filter(c=>c.owner_id===session.user.id).map(c=>`<div class="listitem row"><span class="swatch" style="background:${c.color}"></span><div style="flex:1"><b>${esc(c.icon+" "+c.name)}</b><div class="muted">${c.family_id?"Familie · ":"Nur ich · "}${c.sharing}</div></div><button class="btn" onclick="editCalendar('${c.id}')">✎</button></div>`).join("")}<button class="btn primary wide" onclick="openNewCalendar(false)">＋ Neuen Kalender erstellen</button></div></div>`}
