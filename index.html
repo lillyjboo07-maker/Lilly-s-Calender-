@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#fbf7f4"><title>My Planner ♡</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{--bg:#fbf7f4;--paper:#fffefd;--ink:#403839;--muted:#9b8f90;--line:#eee3e1;--pink:#f4d9df;--blue:#dceaf5;--sage:#dfeadf;--lav:#e7def1;--peach:#f7e2d4;--yellow:#f6edcf;--shadow:0 10px 30px #70505012}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,textarea,select{font:inherit}.app{max-width:760px;margin:auto;min-height:100vh;padding:env(safe-area-inset-top) 14px calc(92px + env(safe-area-inset-bottom))}
+header{padding:20px 5px 10px;display:flex;justify-content:space-between;align-items:center}.brand{font-family:Georgia,serif;font-size:28px}.sub{color:var(--muted);font-size:13px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:16px;box-shadow:var(--shadow);margin:10px 0}.row{display:flex;gap:9px;align-items:center}.between{justify-content:space-between}.btn{border:0;border-radius:14px;padding:10px 13px;background:#f1e8e6;color:var(--ink)}.primary{background:#eecfd6}.round{width:44px;height:44px;border-radius:50%;font-size:24px;padding:0}
+h2,h3,p{margin:5px 0}h2{font:22px Georgia,serif}h3{font-size:15px}.muted{color:var(--muted);font-size:13px}
+.tabs{position:fixed;bottom:0;left:0;right:0;background:#fffefdf2;backdrop-filter:blur(14px);border-top:1px solid var(--line);display:flex;justify-content:center;z-index:20;padding-bottom:env(safe-area-inset-bottom)}
+.tabs button{width:min(25%,190px);border:0;background:none;padding:10px 2px;color:#8d8182;font-size:11px}.tabs b{display:block;font-size:20px;margin-bottom:2px}.tabs .on{color:#7d5960}
+.hidden{display:none!important}.calendar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.month{font:22px Georgia,serif}
+.weekdays,.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.weekdays div{text-align:center;color:var(--muted);font-size:11px;padding:5px}.day{min-height:78px;border:1px solid var(--line);border-radius:12px;padding:6px;background:#fff;overflow:hidden}.day.other{opacity:.38}.day.today{outline:2px solid #e8c3cc}.num{font-size:12px;margin-bottom:4px}.event{font-size:9px;border-radius:6px;padding:3px 4px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dots{display:flex;gap:2px;flex-wrap:wrap}.dot{width:6px;height:6px;border-radius:50%}
+.listitem{padding:11px 0;border-bottom:1px solid var(--line)}.listitem:last-child{border:0}.check{width:22px;height:22px;border:1.5px solid #d7c7c8;border-radius:7px;background:white;flex:0 0 auto}.check.done{background:#dce8dd}.doneText{text-decoration:line-through;color:var(--muted)}
+.pill{border:1px solid var(--line);background:#fff;border-radius:99px;padding:7px 10px;font-size:12px}.calrow{display:flex;align-items:center;gap:10px;padding:9px 0}.swatch{width:16px;height:16px;border-radius:50%}.switch{margin-left:auto;width:42px;height:24px;background:#ddd;border-radius:99px;padding:3px}.switch i{display:block;width:18px;height:18px;border-radius:50%;background:white;transition:.2s}.switch.on i{margin-left:18px}.switch.on{background:#bfcfbf}
+input,textarea,select{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;padding:11px;color:var(--ink)}textarea{min-height:70px;resize:vertical}.label{font-size:12px;color:var(--muted);margin:11px 2px 5px}.modal{position:fixed;inset:0;background:#463b3b55;display:flex;align-items:flex-end;justify-content:center;z-index:50}.sheet{background:var(--bg);width:min(760px,100%);max-height:88vh;overflow:auto;border-radius:25px 25px 0 0;padding:18px 16px calc(24px + env(safe-area-inset-bottom))}
+.fab{position:fixed;right:20px;bottom:82px;z-index:25;background:#e9c5ce;box-shadow:0 7px 18px #73505b25}.progress{height:8px;background:#eee6e4;border-radius:10px;overflow:hidden}.progress i{display:block;height:100%;background:#cbdccf}
+.chips{display:flex;gap:7px;overflow:auto;padding:4px 0}.chip{white-space:nowrap;border:1px solid var(--line);border-radius:99px;padding:7px 10px;background:#fff;font-size:12px}
+@media(max-width:480px){.day{min-height:65px;padding:4px}.event{display:none}.grid{gap:3px}.card{padding:14px}.brand{font-size:25px}}
+</style></head>
+<body><div class="app">
+<header><div><div class="brand">My Planner ♡</div><div class="sub" id="hello"></div></div><button class="btn" onclick="openCalendars()">Kalender</button></header>
+<main id="view"></main>
+<button class="btn round fab" onclick="openAdd()">＋</button>
+<nav class="tabs">
+<button data-tab="today" onclick="tab('today')"><b>♡</b>Heute</button>
+<button data-tab="month" onclick="tab('month')"><b>▦</b>Kalender</button>
+<button data-tab="tasks" onclick="tab('tasks')"><b>✓</b>Aufgaben</button>
+<button data-tab="school" onclick="tab('school')"><b>⌁</b>Schule</button>
+</nav></div><div id="modal"></div>
+<script>
+const KEY="lilly_planner_v1";
+const colors=["#dceaf5","#f4d9df","#e7def1","#dfeadf","#f7e2d4","#f6edcf"];
+const seed=()=>({calendars:[
+{id:"school",name:"Schule",icon:"📚",color:colors[0],visible:true},
+{id:"mo",name:"Mo",icon:"♡",color:colors[1],visible:true},
+{id:"work",name:"Arbeit",icon:"💼",color:colors[2],visible:true},
+{id:"mama",name:"Mama",icon:"👩",color:colors[3],visible:false},
+{id:"private",name:"Privat",icon:"🎀",color:colors[5],visible:true},
+{id:"travel",name:"Reisen & Events",icon:"✈️",color:colors[4],visible:true}
+],events:[],tasks:[],ideas:[],tab:"today"});
+let S;try{S=JSON.parse(localStorage.getItem(KEY))||seed()}catch(e){S=seed()}
+S.calendars??=seed().calendars;S.events??=[];S.tasks??=[];S.ideas??=[];S.tab??="today";
+let cursor=new Date();cursor.setDate(1);
+const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
+const esc=s=>(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const iso=d=>{let x=new Date(d.getTime()-d.getTimezoneOffset()*60000);return x.toISOString().slice(0,10)}
+const today=()=>iso(new Date());
+const cal=id=>S.calendars.find(c=>c.id===id)||S.calendars[0];
+function tab(t){S.tab=t;save();render()}
+function nav(){document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===S.tab))}
+function visibleEvents(date){return S.events.filter(e=>e.date===date && (cal(e.cal)?.visible))}
+function render(){
+document.getElementById("hello").textContent=new Intl.DateTimeFormat("de-DE",{weekday:"long",day:"numeric",month:"long"}).format(new Date());
+nav();let v=document.getElementById("view");
+if(S.tab==="month")v.innerHTML=monthView(); else if(S.tab==="tasks")v.innerHTML=tasksView(); else if(S.tab==="school")v.innerHTML=schoolView(); else v.innerHTML=todayView();
+}
+function todayView(){
+let d=today(), ev=visibleEvents(d).sort((a,b)=>(a.time||"99").localeCompare(b.time||"99")), ts=S.tasks.filter(t=>t.date===d);
+let done=ts.filter(t=>t.done).length,pct=ts.length?Math.round(done/ts.length*100):0;
+return `<div class="card"><div class="muted">DEIN TAG</div><h2>Heute ♡</h2><div class="chips">${S.calendars.filter(c=>c.visible).map(c=>`<span class="chip"><span class="dot" style="display:inline-block;background:${c.color}"></span> ${esc(c.name)}</span>`).join("")}</div></div>
+<div class="card"><div class="between row"><h3>Termine</h3><button class="btn" onclick="openAdd('event','${d}')">＋ Termin</button></div>${ev.length?ev.map(eventHTML).join(""):`<p class="muted" style="padding:12px 0">Heute ist noch nichts eingetragen.</p>`}</div>
+<div class="card"><div class="between row"><div><h3>Meine To-dos ♡</h3><div class="muted">${done}/${ts.length} geschafft</div></div><button class="btn" onclick="openAdd('task','${d}')">＋ To-do</button></div><div class="progress" style="margin:10px 0"><i style="width:${pct}%"></i></div>${ts.length?ts.map(taskHTML).join(""):`<p class="muted">Noch keine To-dos für heute.</p>`}</div>
+${upcoming()}`;
+}
+function upcoming(){let arr=S.events.filter(e=>e.date>today()&&cal(e.cal)?.visible).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);return `<div class="card"><h3>Als Nächstes</h3>${arr.length?arr.map(eventHTML).join(""):`<p class="muted">Noch nichts geplant.</p>`}</div>`}
+function eventHTML(e){let c=cal(e.cal);return `<div class="listitem row" onclick="editEvent('${e.id}')"><span class="swatch" style="background:${c.color}"></span><div style="flex:1"><b>${esc(e.title)}</b><div class="muted">${e.time?esc(e.time)+" · ":""}${esc(c.icon+" "+c.name)}${e.date!==today()?" · "+new Date(e.date+"T12:00").toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"}):""}</div></div></div>`}
+function taskHTML(t){return `<div class="listitem row"><button class="check ${t.done?"done":""}" onclick="toggleTask('${t.id}')">${t.done?"✓":""}</button><div class="${t.done?"doneText":""}" style="flex:1" onclick="editTask('${t.id}')">${esc(t.text)}${t.time?`<div class="muted">${esc(t.time)}</div>`:""}</div>${!t.done?`<button class="btn" onclick="tomorrow('${t.id}')">→ morgen</button>`:""}</div>`}
+function monthView(){
+let y=cursor.getFullYear(),m=cursor.getMonth(), first=new Date(y,m,1), start=(first.getDay()+6)%7, days=new Date(y,m+1,0).getDate(), prev=new Date(y,m,0).getDate(), cells=[];
+for(let i=0;i<42;i++){let n=i-start+1,d,other=false;if(n<1){d=new Date(y,m-1,prev+n);other=true}else if(n>days){d=new Date(y,m+1,n-days);other=true}else d=new Date(y,m,n);let ds=iso(d),ev=visibleEvents(ds),tt=S.tasks.filter(t=>t.date===ds&&!t.done);cells.push(`<div class="day ${other?"other":""} ${ds===today()?"today":""}" onclick="daySheet('${ds}')"><div class="num">${d.getDate()}</div>${ev.slice(0,2).map(e=>`<div class="event" style="background:${cal(e.cal).color}">${esc(e.title)}</div>`).join("")}<div class="dots">${ev.slice(2).map(e=>`<i class="dot" style="background:${cal(e.cal).color}"></i>`).join("")}${tt.length?`<i class="dot" style="background:#aaa"></i>`:""}</div></div>`)}
+return `<div class="card"><div class="calendar-head"><button class="btn" onclick="moveMonth(-1)">‹</button><div class="month">${first.toLocaleDateString("de-DE",{month:"long",year:"numeric"})}</div><button class="btn" onclick="moveMonth(1)">›</button></div><div class="weekdays">${["Mo","Di","Mi","Do","Fr","Sa","So"].map(x=>`<div>${x}</div>`).join("")}</div><div class="grid">${cells.join("")}</div></div>`;
+}
+function moveMonth(n){cursor.setMonth(cursor.getMonth()+n);render()}
+function tasksView(){let dated=S.tasks.filter(t=>t.date).sort((a,b)=>a.date.localeCompare(b.date)), someday=S.tasks.filter(t=>!t.date);return `<div class="card"><div class="between row"><div><div class="muted">AUFGABEN</div><h2>Alles im Blick ✓</h2></div><button class="btn" onclick="openAdd('task')">＋</button></div></div><div class="card"><h3>Geplant</h3>${dated.length?dated.map(t=>`<div><div class="muted" style="margin-top:9px">${new Date(t.date+"T12:00").toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"})}</div>${taskHTML(t)}</div>`).join(""):`<p class="muted">Keine Aufgaben.</p>`}</div><div class="card"><h3>Irgendwann ♡</h3>${someday.length?someday.map(taskHTML).join(""):`<p class="muted">Hier landen Aufgaben ohne Datum.</p>`}</div>`}
+function schoolView(){let exams=S.events.filter(e=>e.kind==="exam").sort((a,b)=>a.date.localeCompare(b.date));return `<div class="card"><div class="muted">SCHULE</div><h2>Klausuren & Lernen 🎓</h2><p class="muted">Klausuren, Abgaben und Lernblöcke an einem Ort.</p><button class="btn primary" style="margin-top:10px" onclick="openAdd('exam')">＋ Klausur</button></div><div class="card"><h3>Klausuren-Countdown</h3>${exams.length?exams.map(e=>{let diff=Math.ceil((new Date(e.date+"T12:00")-new Date(today()+"T12:00"))/86400000);return `<div class="listitem row" onclick="editEvent('${e.id}')"><span class="swatch" style="background:${cal(e.cal).color}"></span><div style="flex:1"><b>${esc(e.title)}</b><div class="muted">${new Date(e.date+"T12:00").toLocaleDateString("de-DE",{day:"numeric",month:"long"})}</div></div><span class="pill">${diff>=0?`noch ${diff} Tage`:"vorbei"}</span></div>`}).join(""):`<p class="muted">Noch keine Klausuren eingetragen.</p>`}</div>`}
+function openCalendars(){document.getElementById("modal").innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="between row"><h2>Meine Kalender</h2><button class="btn" onclick="closeModal()">Fertig</button></div><p class="muted">Tippe einen Kalender an, um ihn im Hauptkalender ein- oder auszublenden.</p>${S.calendars.map(c=>`<div class="calrow" onclick="toggleCal('${c.id}')"><span class="swatch" style="background:${c.color}"></span><span>${esc(c.icon)} ${esc(c.name)}</span><span class="switch ${c.visible?"on":""}"><i></i></span></div>`).join("")}<button class="btn" style="width:100%;margin-top:10px" onclick="newCalendar()">＋ Neuen Kalender erstellen</button></div></div>`}
+function toggleCal(id){let c=cal(id);c.visible=!c.visible;save();openCalendars();render()}
+function newCalendar(){let name=prompt("Wie soll der Kalender heißen?");if(!name)return;let icon=prompt("Welches Symbol?","♡")||"♡";let color=colors[S.calendars.length%colors.length];S.calendars.push({id:"c"+Date.now(),name,icon,color,visible:true});save();openCalendars();render()}
+function openAdd(type="event",date=today()){let exam=type==="exam";document.getElementById("modal").innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="between row"><h2>${type==="task"?"Neues To-do":exam?"Neue Klausur":"Neuer Termin"} ♡</h2><button class="btn" onclick="closeModal()">×</button></div>${type==="task"?taskForm(date):eventForm(date,exam)}</div></div>`}
+function eventForm(date,exam){return `<div class="label">Titel</div><input id="fTitle" placeholder="${exam?"z. B. Bio Klausur":"Was steht an?"}"><div class="row"><div style="flex:1"><div class="label">Datum</div><input id="fDate" type="date" value="${date||today()}"></div><div style="flex:1"><div class="label">Uhrzeit (optional)</div><input id="fTime" type="time"></div></div><div class="label">Kalender</div><select id="fCal">${S.calendars.map(c=>`<option value="${c.id}" ${exam&&c.id==="school"?"selected":""}>${esc(c.icon+" "+c.name)}</option>`).join("")}</select><div class="label">Notiz / Ort</div><textarea id="fNote" placeholder="Optional…"></textarea><button class="btn primary" style="width:100%;margin-top:14px" onclick="saveEvent(${exam})">Speichern</button>`}
+function taskForm(date){return `<div class="label">Aufgabe</div><input id="fText" placeholder="z. B. Zimmer saugen"><div class="row"><div style="flex:1"><div class="label">Datum (optional)</div><input id="fDate" type="date" value="${date||""}"></div><div style="flex:1"><div class="label">Uhrzeit (optional)</div><input id="fTime" type="time"></div></div><button class="btn primary" style="width:100%;margin-top:14px" onclick="saveTask()">Hinzufügen</button>`}
+function saveEvent(exam){let title=fTitle.value.trim();if(!title)return alert("Gib bitte einen Titel ein.");S.events.push({id:"e"+Date.now(),title,date:fDate.value,time:fTime.value,cal:fCal.value,note:fNote.value,kind:exam?"exam":"event"});save();closeModal();render()}
+function saveTask(){let text=fText.value.trim();if(!text)return;S.tasks.push({id:"t"+Date.now(),text,date:fDate.value,time:fTime.value,done:false});save();closeModal();render()}
+function toggleTask(id){let t=S.tasks.find(x=>x.id===id);t.done=!t.done;save();render();if(document.getElementById("modal").innerHTML)daySheet(t.date)}
+function tomorrow(id){let t=S.tasks.find(x=>x.id===id),d=new Date((t.date||today())+"T12:00");d.setDate(d.getDate()+1);t.date=iso(d);save();render()}
+function daySheet(date){let ev=visibleEvents(date).sort((a,b)=>(a.time||"99").localeCompare(b.time||"99")),ts=S.tasks.filter(t=>t.date===date);document.getElementById("modal").innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="between row"><div><div class="muted">${new Date(date+"T12:00").toLocaleDateString("de-DE",{weekday:"long"})}</div><h2>${new Date(date+"T12:00").toLocaleDateString("de-DE",{day:"numeric",month:"long"})}</h2></div><button class="btn" onclick="closeModal()">×</button></div><div class="card"><div class="between row"><h3>Termine</h3><button class="btn" onclick="openAdd('event','${date}')">＋</button></div>${ev.length?ev.map(eventHTML).join(""):`<p class="muted">Keine Termine.</p>`}</div><div class="card"><div class="between row"><h3>To-dos ✓</h3><button class="btn" onclick="openAdd('task','${date}')">＋</button></div>${ts.length?ts.map(taskHTML).join(""):`<p class="muted">Keine To-dos.</p>`}</div></div></div>`}
+function editEvent(id){let e=S.events.find(x=>x.id===id);if(!e)return;document.getElementById("modal").innerHTML=`<div class="modal"><div class="sheet"><div class="between row"><h2>${esc(e.title)}</h2><button class="btn" onclick="closeModal()">×</button></div><p>${new Date(e.date+"T12:00").toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"})}${e.time?" · "+esc(e.time):""}</p><p class="muted">${esc(cal(e.cal).icon+" "+cal(e.cal).name)}</p>${e.note?`<div class="card">${esc(e.note)}</div>`:""}<button class="btn" style="width:100%;margin-top:15px" onclick="deleteEvent('${id}')">Termin löschen</button></div></div>`}
+function deleteEvent(id){if(confirm("Termin wirklich löschen?")){S.events=S.events.filter(e=>e.id!==id);save();closeModal();render()}}
+function editTask(id){let t=S.tasks.find(x=>x.id===id);if(!t)return;let val=prompt("To-do bearbeiten:",t.text);if(val!==null&&val.trim()){t.text=val.trim();save();render()}}
+function closeModal(){document.getElementById("modal").innerHTML=""}
+render();
+if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js");
+</script></body></html>
