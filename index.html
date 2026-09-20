@@ -56,10 +56,31 @@ function toggleCalendarVisibility(id){
   localStorage.setItem(hiddenKey(),JSON.stringify(hidden));
   render();
 }
-const viewKey=()=>`planner_calendar_view_${session?.user?.id||"guest"}`;
-function activeCalendarView(){return localStorage.getItem(viewKey())||"all"}
-function setCalendarView(id){localStorage.setItem(viewKey(),id);closeModal();render()}
-function viewAllowsCalendar(id){let v=activeCalendarView();return v==="all"?calendarVisible(id):v===id}
+const personalNameKey=()=>`planner_personal_name_${session?.user?.id||"guest"}`;
+const calendarViewKey=()=>`planner_main_view_${session?.user?.id||"guest"}`;
+function personalCalendarName(){return localStorage.getItem(personalNameKey())||profile?.display_name||session?.user?.user_metadata?.display_name||"Mein Kalender"}
+function renamePersonalCalendar(){
+  let next=prompt("Wie soll dein persönlicher Hauptkalender heißen?",personalCalendarName());
+  if(next===null)return;
+  next=next.trim();
+  if(!next)return msg("Bitte gib einen Namen ein.");
+  localStorage.setItem(personalNameKey(),next);
+  openCalendars();
+}
+function activeCalendarView(){return localStorage.getItem(calendarViewKey())||"personal"}
+function setCalendarView(v){localStorage.setItem(calendarViewKey(),v);closeModal();render()}
+function calendarInActiveView(c){
+  let v=activeCalendarView();
+  if(v.startsWith("cal:"))return c?.id===v.slice(4);
+  if(v==="family")return !!family && c?.family_id===family.id;
+  return !!c && c.owner_id===session.user.id && !c.family_id;
+}
+function activeViewLabel(){
+  let v=activeCalendarView();
+  if(v==="family")return family?.name||"Familie";
+  if(v.startsWith("cal:"))return cal(v.slice(4))?.name||"Kalender";
+  return personalCalendarName();
+}
 function msg(x){alert(x)}
 async function boot(){
  const {data}=await db.auth.getSession();session=data.session;
@@ -108,7 +129,7 @@ async function signOut(){await db.auth.signOut()}
 function tab(t){tabName=t;render()}
 function render(){
  document.getElementById("tabs").style.display="flex";document.getElementById("fab").style.display="block";document.getElementById("calBtn").style.display="block";
- {let v=activeCalendarView(),vc=cal(v);document.getElementById("hello").textContent=v==="all"?new Intl.DateTimeFormat("de-DE",{weekday:"long",day:"numeric",month:"long"}).format(new Date()):`${vc?.icon||"♡"} ${vc?.name||"Kalender"}`;}
+ document.getElementById("hello").textContent=activeViewLabel()+" · "+new Intl.DateTimeFormat("de-DE",{weekday:"long",day:"numeric",month:"long"}).format(new Date());
  document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tabName));
  if(tabName==="family")familyView();else if(tabName==="month")monthView();else if(tabName==="tasks")tasksView();else todayView();
 }
@@ -140,7 +161,7 @@ function eventOccursOn(e,d){
   }
   return d<= (e.end_date||e.start_date);
 }
-function ownEvents(d){return events.filter(e=>viewAllowsCalendar(e.calendar_id)&&eventOccursOn(e,d))}
+function ownEvents(d){return events.filter(e=>{let c=cal(e.calendar_id);return calendarInActiveView(c)&&calendarVisible(e.calendar_id)&&eventOccursOn(e,d)})}
 function eventTimeValue(v){if(!v)return "";let m=String(v).match(/T(\d{2}:\d{2})/);return m?m[1]:String(v).slice(0,5)} function eventTimestamp(date,time){return time?`${date}T${time}:00`:null} function canEditEvent(e){return !!e&&(e.owner_id===session.user.id||e.family_can_edit===true)} function eventLine(e,occDate=null){let c=cal(e.calendar_id);let tm=!e.all_day&&e.starts_at?` · ${eventTimeValue(e.starts_at)}${e.ends_at?`–${eventTimeValue(e.ends_at)}`:""}`:"";let od=occDate||e.start_date;let editable=canEditEvent(e);return `<div class="listitem row" ${editable?`onclick="editEvent('${e.id}','${od}')" style="cursor:pointer"`:''}><span class="swatch" style="background:${c?.color||'#ddd'}"></span><div style="flex:1"><b>${esc(e.title)}</b><div class="muted">${esc(c?.icon||'♡')} ${esc(c?.name||'Kalender')}${tm}${e.owner_id!==session.user.id&&e.family_can_edit?' · bearbeitbar':''}</div></div>${editable?'<span class="muted">✎</span>':''}</div>`}
 function todayView(){let d=today(),ev=ownEvents(d),ts=tasks.filter(t=>t.due_date===d);document.getElementById("view").innerHTML=`<div class="card"><div class="muted">DEIN TAG</div><h2>Heute ♡</h2></div><div class="card"><div class="between row"><h3>Termine</h3><button class="btn" onclick="openAdd('event','${d}')">＋ Termin</button></div>${ev.length?ev.map(e=>eventLine(e,d)).join(""):`<p class="muted" style="padding:12px 0">Heute ist noch nichts eingetragen.</p>`}</div><div class="card"><div class="between row"><h3>Meine To-dos</h3><button class="btn" onclick="openAdd('task','${d}')">＋</button></div>${ts.length?ts.map(taskLine).join(""):`<p class="muted">Noch keine To-dos.</p>`}</div>`}
 function monthView(){let y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),start=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate(),prev=new Date(y,m,0).getDate(),cells=[];
@@ -156,7 +177,49 @@ async function familyView(){
 async function createFamily(){let b=document.querySelector('button[onclick="createFamily()"]');if(b){b.disabled=true;b.textContent="Wird erstellt …"}let {error}=await db.rpc("create_family",{p_name:familyName.value.trim()||"Familie"});if(error){if(b){b.disabled=false;b.textContent="Familie erstellen"}return msg(error.message)}await load()}
 async function joinFamily(){let {error}=await db.rpc("join_family",{p_code:joinCode.value.trim()});if(error)return msg(error.message);await load()}
 async function copyCode(){try{await navigator.clipboard.writeText(family.invite_code);msg("Einladungscode kopiert ♡")}catch(e){msg("Code: "+family.invite_code)}}
-function openCalendars(){let v=activeCalendarView();let mine=calendars.filter(c=>c.owner_id===session.user.id);let shared=calendars.filter(c=>c.owner_id!==session.user.id&&c.family_id===family?.id);document.getElementById("modal").innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="between row"><h2>Kalender ♡</h2><button class="btn" onclick="closeModal()">Fertig</button></div><p class="muted">Öffne einen Kalender einzeln oder nutze „Lili“, um mehrere Kalender zusammen anzuzeigen.</p><div class="label">MEINE ANSICHT</div><div class="listitem row" onclick="setCalendarView('all')" style="cursor:pointer"><span class="swatch" style="background:#f4d9df"></span><div style="flex:1"><b>♡ Lili</b><div class="muted">Deine persönliche Gesamtansicht</div></div><span>${v==='all'?'✓':'›'}</span></div><div class="label">MEINE KALENDER</div>${mine.map(c=>`<div class="listitem row"><span class="swatch" style="background:${c.color}"></span><div style="flex:1;cursor:pointer" onclick="setCalendarView('${c.id}')"><b>${esc(c.icon+' '+c.name)}</b><div class="muted">${c.family_id?'Mit Familie geteilt':'Privat'} · ${v===c.id?'gerade geöffnet':calendarVisible(c.id)?'in Lili sichtbar':'in Lili ausgeblendet'}</div></div><button class="btn" onclick="event.stopPropagation();toggleCalendarVisibility('${c.id}')">${calendarVisible(c.id)?'👁':'◌'}</button><button class="btn" onclick="event.stopPropagation();editCalendar('${c.id}')">✎</button></div>`).join("")}${shared.length?`<div class="label">FAMILIENKALENDER</div>${shared.map(c=>`<div class="listitem row"><span class="swatch" style="background:${c.color}"></span><div style="flex:1;cursor:pointer" onclick="setCalendarView('${c.id}')"><b>${esc(c.icon+' '+c.name)}</b><div class="muted">Familienmitglied · ${v===c.id?'gerade geöffnet':calendarVisible(c.id)?'in Lili sichtbar':'in Lili ausgeblendet'}</div></div><button class="btn" onclick="event.stopPropagation();toggleCalendarVisibility('${c.id}')">${calendarVisible(c.id)?'👁':'◌'}</button></div>`).join("")}`:''}<button class="btn primary wide" onclick="openNewCalendar(false)">＋ Neuen Kalender erstellen</button></div></div>`} 
+function openCalendars(){
+ let v=activeCalendarView();
+ let mine=calendars.filter(c=>c.owner_id===session.user.id&&!c.family_id);
+ let shared=family?calendars.filter(c=>c.family_id===family.id):[];
+ document.getElementById("modal").innerHTML=`<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet">
+ <div class="between row"><h2>Kalender ♡</h2><button class="btn" onclick="closeModal()">Fertig</button></div>
+
+ <div class="card" style="margin-top:14px">
+   <div class="between row">
+     <div style="flex:1;cursor:pointer" onclick="setCalendarView('personal')">
+       <div class="muted">PERSÖNLICHER HAUPTKALENDER</div>
+       <h2>${esc(personalCalendarName())} ♡</h2>
+       <div class="muted">${v==="personal"?"Gerade geöffnet":"Antippen, um alle privaten Unterkalender zusammen zu sehen"}</div>
+     </div>
+     <button class="btn" onclick="event.stopPropagation();renamePersonalCalendar()">✎</button>
+   </div>
+   <div style="margin-top:10px">
+   ${mine.length?mine.map(c=>`<div class="listitem row">
+      <span class="swatch" style="background:${c.color}"></span>
+      <div style="flex:1;cursor:pointer" onclick="setCalendarView('cal:${c.id}')"><b>${esc(c.icon+" "+c.name)}</b><div class="muted">${v==="cal:"+c.id?"Nur dieser Unterkalender ist geöffnet":calendarVisible(c.id)?"Im Hauptkalender sichtbar":"Im Hauptkalender ausgeblendet"}</div></div>
+      <button class="btn" onclick="event.stopPropagation();toggleCalendarVisibility('${c.id}');openCalendars()">${calendarVisible(c.id)?"👁":"◌"}</button>
+      <button class="btn" onclick="event.stopPropagation();editCalendar('${c.id}')">✎</button>
+   </div>`).join(""):`<p class="muted">Noch keine privaten Unterkalender.</p>`}
+   </div>
+   <button class="btn primary wide" onclick="openNewCalendar(false)">＋ Privaten Unterkalender erstellen</button>
+ </div>
+
+ <div class="card">
+   <div style="cursor:pointer" onclick="setCalendarView('family')">
+     <div class="muted">FAMILIEN-HAUPTKALENDER</div>
+     <h2>${esc(family?.name||"Familie")} ♡</h2>
+     <div class="muted">${v==="family"?"Gerade geöffnet":"Antippen, um eure Familienkalender zusammen zu sehen"}</div>
+   </div>
+   <div style="margin-top:10px">
+   ${shared.length?shared.map(c=>`<div class="listitem row">
+      <span class="swatch" style="background:${c.color}"></span>
+      <div style="flex:1;cursor:pointer" onclick="setCalendarView('cal:${c.id}')"><b>${esc(c.icon+" "+c.name)}</b><div class="muted">${c.owner_id===session.user.id?"Von dir":"Familienmitglied"} · ${v==="cal:"+c.id?"nur dieser Kalender geöffnet":calendarVisible(c.id)?"sichtbar":"ausgeblendet"}</div></div>
+      <button class="btn" onclick="event.stopPropagation();toggleCalendarVisibility('${c.id}');openCalendars()">${calendarVisible(c.id)?"👁":"◌"}</button>
+   </div>`).join(""):`<p class="muted">Noch keine freigegebenen Kalender.</p>`}
+   </div>
+ </div>
+ </div></div>`;
+}
 function openNewCalendar(share=false){document.getElementById("modal").innerHTML=`<div class="modal"><div class="sheet"><div class="between row"><h2>Neuer Kalender ♡</h2><button class="btn" onclick="closeModal()">×</button></div><div class="label">Name</div><input id="cName" placeholder="z. B. Schule, Mo, Arbeit"><div class="label">Symbol</div><input id="cIcon" value="♡"><div class="label">Farbe</div><input id="cColor" type="color" value="#f4d9df"><div class="label">Freigabe</div><select id="cShare"><option value="private">Privat – nur ich</option>${family?`<option value="details" ${share?"selected":""}>Familie – Details sichtbar</option><option value="busy">Familie – nur beschäftigt</option>`:""}</select><button class="btn primary wide" onclick="saveCalendar()">Speichern</button></div></div>`}
 async function saveCalendar(){let sharing=cShare.value,fid=sharing==="private"?null:family?.id;let {error}=await db.from("calendars").insert({owner_id:session.user.id,family_id:fid,name:cName.value.trim()||"Kalender",icon:cIcon.value.trim()||"♡",color:cColor.value,sharing});if(error)return msg(error.message);closeModal();await load()}
 function editCalendar(id){let c=cal(id);document.getElementById("modal").innerHTML=`<div class="modal"><div class="sheet"><div class="between row"><h2>Kalender bearbeiten</h2><button class="btn" onclick="closeModal()">×</button></div><div class="label">Name</div><input id="cName" value="${esc(c.name)}"><div class="label">Symbol</div><input id="cIcon" value="${esc(c.icon)}"><div class="label">Farbe</div><input id="cColor" type="color" value="${c.color}"><div class="label">Freigabe</div><select id="cShare"><option value="private" ${c.sharing==="private"?"selected":""}>Privat – nur ich</option>${family?`<option value="details" ${c.sharing==="details"?"selected":""}>Familie – Details sichtbar</option><option value="busy" ${c.sharing==="busy"?"selected":""}>Familie – nur beschäftigt</option>`:""}</select><button class="btn primary wide" onclick="updateCalendar('${id}')">Speichern</button></div></div>`}
