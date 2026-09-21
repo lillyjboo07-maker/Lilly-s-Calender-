@@ -20,8 +20,7 @@ input,textarea,select{width:100%;border:1px solid var(--line);border-radius:12px
 .tabs button{width:min(25%,190px);border:0;background:none;padding:10px 2px;color:#8d8182;font-size:11px}.tabs b{display:block;font-size:20px}.tabs .on{color:#7d5960}
 .fab{position:fixed;right:20px;bottom:82px;z-index:25;background:#e9c5ce}.calendar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.month{font:22px Georgia,serif}
 .weekdays,.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.weekdays div{text-align:center;color:var(--muted);font-size:11px;padding:5px}
-.day{min-height:78px;border:1px solid var(--line);border-radius:12px;padding:5px;background:#fff;overflow:hidden}.day.other{opacity:.38}.day.today{outline:2px solid #e8c3cc}.num{font-size:12px;margin-bottom:3px}
-.event{font-size:8px;border-radius:6px;padding:3px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.listitem{padding:11px 0;border-bottom:1px solid var(--line)}.swatch{width:15px;height:15px;border-radius:50%;flex:0 0 auto}
+.grid.month-weeks{display:block}.calweek{position:relative;display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}.calweek.has-multiday .day{padding-top:58px}.day{min-height:78px;border:1px solid var(--line);border-radius:12px;padding:5px;background:#fff;overflow:hidden}.day.other{opacity:.38}.day.today{outline:2px solid #e8c3cc}.num{font-size:12px;margin-bottom:3px}.weekbars{position:absolute;z-index:3;left:0;right:0;top:25px;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:14px;gap:2px 4px;pointer-events:none}.multibar{font-size:8px;line-height:14px;height:14px;border-radius:5px;padding:0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;pointer-events:auto;cursor:pointer;box-shadow:0 1px 2px #70505012}.multibar.cont-left{border-radius:2px 5px 5px 2px}.multibar.cont-right{border-radius:5px 2px 2px 5px}.multibar.cont-left.cont-right{border-radius:2px}.event{font-size:8px;border-radius:6px;padding:3px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.listitem{padding:11px 0;border-bottom:1px solid var(--line)}.swatch{width:15px;height:15px;border-radius:50%;flex:0 0 auto}
 .modal{position:fixed;inset:0;background:#463b3b55;display:flex;align-items:flex-end;justify-content:center;z-index:50}.sheet{background:var(--bg);width:min(760px,100%);max-height:90vh;overflow:auto;border-radius:25px 25px 0 0;padding:18px 16px calc(24px + env(safe-area-inset-bottom))}
 .pill{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:6px 9px;font-size:11px;background:#fff}.code{font:700 24px ui-monospace,monospace;letter-spacing:2px;text-align:center;padding:12px}
 .check{width:22px;height:22px;border:1px solid #d7c7c8;border-radius:7px;background:#fff;flex:0 0 auto}.check.done{background:#dce8dd}.doneText{text-decoration:line-through;color:var(--muted)}
@@ -166,9 +165,57 @@ function eventOccursOn(e,d){
 function ownEvents(d){return events.filter(e=>{let c=cal(e.calendar_id);return calendarInActiveView(c)&&calendarVisible(e.calendar_id)&&eventOccursOn(e,d)})}
 function eventTimeValue(v){if(!v)return "";let m=String(v).match(/T(\d{2}:\d{2})/);return m?m[1]:String(v).slice(0,5)} function eventTimestamp(date,time){return time?`${date}T${time}:00`:null} function canEditEvent(e){return !!e&&(e.owner_id===session.user.id||e.family_can_edit===true)} function eventLine(e,occDate=null){let c=cal(e.calendar_id);let tm=!e.all_day&&e.starts_at?` · ${eventTimeValue(e.starts_at)}${e.ends_at?`–${eventTimeValue(e.ends_at)}`:""}`:"";let od=occDate||e.start_date;let editable=canEditEvent(e);return `<div class="listitem row" ${editable?`onclick="editEvent('${e.id}','${od}')" style="cursor:pointer"`:''}><span class="swatch" style="background:${c?.color||'#ddd'}"></span><div style="flex:1"><b>${esc(e.title)}</b><div class="muted">${esc(c?.icon||'♡')} ${esc(c?.name||'Kalender')}${tm}${e.owner_id!==session.user.id&&e.family_can_edit?' · bearbeitbar':''}</div></div>${editable?'<span class="muted">✎</span>':''}</div>`}
 function todayView(){let d=today(),ev=ownEvents(d),ts=privateTodosForDay(d);document.getElementById("view").innerHTML=`<div class="card"><div class="muted">DEIN TAG</div><h2>Heute ♡</h2></div><div class="card"><div class="between row"><h3>Termine</h3><button class="btn" onclick="openAdd('event','${d}')">＋ Termin</button></div>${ev.length?ev.map(e=>eventLine(e,d)).join(""):`<p class="muted" style="padding:12px 0">Heute ist noch nichts eingetragen.</p>`}</div><div class="card"><div class="between row"><h3>Meine To-dos</h3><button class="btn" onclick="openAdd('task','${d}')">＋</button></div>${ts.length?ts.map(taskLine).join(""):`<p class="muted">Noch keine To-dos.</p>`}</div>`}
-function monthView(){let y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),start=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate(),prev=new Date(y,m,0).getDate(),cells=[];
-for(let i=0;i<42;i++){let n=i-start+1,d,other=false;if(n<1){d=new Date(y,m-1,prev+n);other=true}else if(n>days){d=new Date(y,m+1,n-days);other=true}else d=new Date(y,m,n);let ds=iso(d),ev=ownEvents(ds);cells.push(`<div class="day ${other?"other":""} ${ds===today()?"today":""}" onclick="daySheet('${ds}')"><div class="num">${d.getDate()}</div>${ev.slice(0,3).map(e=>`<div class="event" style="background:${cal(e.calendar_id)?.color||'#eee'}">${esc(e.title)}</div>`).join("")}${ev.length>3?`<div class="event" style="background:var(--soft);text-align:center;font-weight:600">••• +${ev.length-3}</div>`:""}</div>`)}
-document.getElementById("view").innerHTML=`<div class="card"><div class="calendar-head"><button class="btn" onclick="cursor.setMonth(cursor.getMonth()-1);monthView()">‹</button><div class="month">${first.toLocaleDateString("de-DE",{month:"long",year:"numeric"})}</div><button class="btn" onclick="cursor.setMonth(cursor.getMonth()+1);monthView()">›</button></div><div class="weekdays">${["Mo","Di","Mi","Do","Fr","Sa","So"].map(x=>`<div>${x}</div>`).join("")}</div><div class="grid">${cells.join("")}</div></div>`}
+function monthView(){
+ let y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),start=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate(),prev=new Date(y,m,0).getDate();
+ let dates=[];
+ for(let i=0;i<42;i++){
+   let n=i-start+1,d,other=false;
+   if(n<1){d=new Date(y,m-1,prev+n);other=true}else if(n>days){d=new Date(y,m+1,n-days);other=true}else d=new Date(y,m,n);
+   dates.push({date:d,ds:iso(d),other});
+ }
+ let weeks=[];
+ for(let w=0;w<6;w++){
+   let wd=dates.slice(w*7,w*7+7);
+   let multi=[];
+   let visibleEvents=events.filter(e=>{let c=cal(e.calendar_id);return calendarInActiveView(c)&&calendarVisible(e.calendar_id)});
+   visibleEvents.forEach(e=>{
+     let duration=Math.max(0,dateDiffDays(e.start_date,e.end_date||e.start_date));
+     if(duration<1)return;
+     let runs=[],runStart=null;
+     for(let i=0;i<7;i++){
+       let on=eventOccursOn(e,wd[i].ds);
+       if(on&&runStart===null)runStart=i;
+       if((!on||i===6)&&runStart!==null){
+         let end=on&&i===6?i:i-1;
+         runs.push([runStart,end]);runStart=null;
+       }
+     }
+     runs.forEach(([a,b])=>{
+       let before=new Date(wd[a].ds+'T12:00');before.setDate(before.getDate()-1);
+       let after=new Date(wd[b].ds+'T12:00');after.setDate(after.getDate()+1);
+       multi.push({e,start:a,end:b,contLeft:eventOccursOn(e,iso(before)),contRight:eventOccursOn(e,iso(after))});
+     });
+   });
+   multi.sort((a,b)=>a.start-b.start||b.end-a.end);
+   let lanes=[];
+   multi.forEach(seg=>{
+     let lane=lanes.findIndex(lastEnd=>seg.start>lastEnd);
+     if(lane<0){lane=lanes.length;lanes.push(seg.end)}else lanes[lane]=seg.end;
+     seg.lane=lane;
+   });
+   let shownMulti=multi.filter(s=>s.lane<3);
+   let bars=shownMulti.map(s=>`<div class="multibar ${s.contLeft?'cont-left':''} ${s.contRight?'cont-right':''}" style="grid-column:${s.start+1}/${s.end+2};grid-row:${s.lane+1};background:${cal(s.e.calendar_id)?.color||'#eee'}" onclick="event.stopPropagation();editEvent('${s.e.id}','${wd[s.start].ds}')">${s.contLeft?'':esc(s.e.title)}</div>`).join('');
+   let cells=wd.map((x,i)=>{
+     let all=ownEvents(x.ds),single=all.filter(e=>Math.max(0,dateDiffDays(e.start_date,e.end_date||e.start_date))===0);
+     let hiddenMulti=multi.filter(s=>s.start<=i&&s.end>=i&&s.lane>=3).length;
+     let display=single.slice(0,3);
+     let extra=Math.max(0,single.length-3)+hiddenMulti;
+     return `<div class="day ${x.other?'other':''} ${x.ds===today()?'today':''}" onclick="daySheet('${x.ds}')"><div class="num">${x.date.getDate()}</div>${display.map(e=>`<div class="event" style="background:${cal(e.calendar_id)?.color||'#eee'}">${esc(e.title)}</div>`).join('')}${extra>0?`<div class="event" style="background:var(--soft);text-align:center;font-weight:600">••• +${extra}</div>`:''}</div>`;
+   }).join('');
+   weeks.push(`<div class="calweek ${shownMulti.length?'has-multiday':''}">${cells}${shownMulti.length?`<div class="weekbars">${bars}</div>`:''}</div>`);
+ }
+ document.getElementById("view").innerHTML=`<div class="card"><div class="calendar-head"><button class="btn" onclick="cursor.setMonth(cursor.getMonth()-1);monthView()">‹</button><div class="month">${first.toLocaleDateString("de-DE",{month:"long",year:"numeric"})}</div><button class="btn" onclick="cursor.setMonth(cursor.getMonth()+1);monthView()">›</button></div><div class="weekdays">${["Mo","Di","Mi","Do","Fr","Sa","So"].map(x=>`<div>${x}</div>`).join("")}</div><div class="grid month-weeks">${weeks.join("")}</div></div>`
+}
 function cleanFamilyName(raw){
  let s=(raw||"").trim();if(!s)return "Familienmitglied";
  let low=s.toLowerCase();
