@@ -169,7 +169,16 @@ function todayView(){let d=today(),ev=ownEvents(d),ts=privateTodosForDay(d);docu
 function monthView(){let y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),start=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate(),prev=new Date(y,m,0).getDate(),cells=[];
 for(let i=0;i<42;i++){let n=i-start+1,d,other=false;if(n<1){d=new Date(y,m-1,prev+n);other=true}else if(n>days){d=new Date(y,m+1,n-days);other=true}else d=new Date(y,m,n);let ds=iso(d),ev=ownEvents(ds);cells.push(`<div class="day ${other?"other":""} ${ds===today()?"today":""}" onclick="daySheet('${ds}')"><div class="num">${d.getDate()}</div>${ev.slice(0,3).map(e=>`<div class="event" style="background:${cal(e.calendar_id)?.color||'#eee'}">${esc(e.title)}</div>`).join("")}${ev.length>3?`<div class="event" style="background:var(--soft);text-align:center;font-weight:600">••• +${ev.length-3}</div>`:""}</div>`)}
 document.getElementById("view").innerHTML=`<div class="card"><div class="calendar-head"><button class="btn" onclick="cursor.setMonth(cursor.getMonth()-1);monthView()">‹</button><div class="month">${first.toLocaleDateString("de-DE",{month:"long",year:"numeric"})}</div><button class="btn" onclick="cursor.setMonth(cursor.getMonth()+1);monthView()">›</button></div><div class="weekdays">${["Mo","Di","Mi","Do","Fr","Sa","So"].map(x=>`<div>${x}</div>`).join("")}</div><div class="grid">${cells.join("")}</div></div>`}
-function memberName(id){if(!id)return "Alle";if(id===session.user.id)return profile?.display_name||profile?.name||session.user.user_metadata?.display_name||"Ich";let p=familyProfiles.find(x=>x.id===id);if(p)return p.display_name||p.name||p.full_name||"Familienmitglied";let owned=calendars.find(c=>c.owner_id===id);return owned?.name?owned.name.replace(/^JHH\s+/i,""):"Familienmitglied"}
+function cleanFamilyName(raw){
+ let s=(raw||"").trim();if(!s)return "Familienmitglied";
+ let low=s.toLowerCase();
+ if(low.includes("lilly")||low.includes("lilli"))return "Lilly";
+ if(low.includes("mama")||low.includes("mutter"))return "Mama";
+ if(low.includes("mike"))return "Mike";
+ s=s.replace(/^JHH\s+/i,"").replace(/[._-]+/g," ").replace(/\b(arbeit|kalender)\b/gi,"").replace(/\d+/g,"").replace(/\s+/g," ").trim();
+ return s?s.charAt(0).toUpperCase()+s.slice(1):"Familienmitglied"
+}
+function memberName(id){if(!id)return "Alle";let p=familyProfiles.find(x=>x.id===id);let raw=p?.display_name||p?.name||p?.full_name;if(!raw&&id===session.user.id)raw=profile?.display_name||profile?.name||session.user.user_metadata?.display_name;if(!raw){let owned=calendars.find(c=>c.owner_id===id);raw=owned?.name}return cleanFamilyName(raw)}
 function taskIsFamily(t){return t.task_type==="family"}
 function taskIsOverdue(t){return !!t.due_date&&!t.done&&t.due_date<today()}
 function privateTodosForDay(d=today()){return tasks.filter(t=>!taskIsFamily(t)&&t.owner_id===session.user.id&&(!t.due_date||t.due_date<=d)&&(!t.done||t.due_date===d))}
