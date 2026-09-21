@@ -145,7 +145,10 @@ function monthView(){
      let single=ownEvents(x.ds).filter(e=>Math.max(0,dateDiffDays(e.start_date,e.end_date||e.start_date))===0);
      let hiddenMulti=multi.filter(s=>s.start<=i&&s.end>=i&&s.lane>=3).length;
      let display=single.slice(0,3),extra=Math.max(0,single.length-3)+hiddenMulti;
-     return `<div class="day ${x.other?'other':''} ${x.ds===today()?'today':''}" onclick="daySheet('${x.ds}')"><div class="num">${x.date.getDate()}</div><div class="dayevents" style="${barSpace?`padding-top:${barSpace}px`:''}">${display.map(e=>`<div class="event" style="background:${cal(e.calendar_id)?.color||'#eee'}">${esc(e.title)}</div>`).join("")}${extra>0?`<div class="event" style="background:var(--soft);text-align:center;font-weight:600">••• +${extra}</div>`:""}</div></div>`;
+     // Only reserve vertical space on THIS day for bar lanes that actually cross THIS day.
+     let activeLanes=shown.filter(s=>s.start<=i&&s.end>=i).map(s=>s.lane);
+     let dayBarSpace=activeLanes.length?(Math.max(...activeLanes)+1)*16:0;
+     return `<div class="day ${x.other?'other':''} ${x.ds===today()?'today':''}" onclick="daySheet('${x.ds}')"><div class="num">${x.date.getDate()}</div><div class="dayevents" style="${dayBarSpace?`padding-top:${dayBarSpace}px`:''}">${display.map(e=>`<div class="event" style="background:${cal(e.calendar_id)?.color||'#eee'}">${esc(e.title)}</div>`).join("")}${extra>0?`<div class="event" style="background:var(--soft);text-align:center;font-weight:600">••• +${extra}</div>`:""}</div></div>`;
    }).join("");
    weeks.push(`<div class="calweek">${cells}${laneCount?`<div class="weekbars">${bars}</div>`:""}</div>`);
  }
